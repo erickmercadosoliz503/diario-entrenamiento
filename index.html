@@ -219,7 +219,7 @@ function render(){
   if(view==='plan')return renderPlan();
   if(view==='list'){
     var L=sorted();
-    app.innerHTML=(role==='coach'?csel():'')+(L.length?'<div class="list">'+L.map(function(s){return '<div class="cw">'+card(s)+(isRO()?'':'<div><button class="del" style="color:var(--ink)" data-ddup="'+esc(s.id)+'">Duplicar</button><button class="del" data-dses="'+esc(s.id)+'">Borrar</button></div>')+'</div>'}).join('')+'</div>':'<div class="empty">No hay días guardados.</div>');
+    app.innerHTML=(role==='coach'?csel():'')+(L.length?'<div class="list">'+L.map(function(s){return '<div class="cw">'+card(s)+(isRO()?'':'<div><button class="del" data-dses="'+esc(s.id)+'">Borrar</button></div>')+'</div>'}).join('')+'</div>':'<div class="empty">No hay días guardados.</div>');
     return;
   }
   var s=cur();if(!s&&role==='coach'&&db.sessions.length){db.cur=sorted()[0].id;s=cur()}if(!s){if(role==='coach'){app.innerHTML=csel()+'<div class="empty">Sin sesiones.</div>';return}s=blank();db.sessions.push(s);db.cur=s.id;save()}
@@ -239,9 +239,9 @@ function render(){
     h+='</tbody></table>'+(ro||(e.w||[]).length>=3?'':'<button class="del wadd" data-wadd="'+i+'">+ Serie de calentamiento</button>')+'<textarea rows="1" data-e="'+i+'" data-f="notas" placeholder="Notas">'+esc(e.notas)+'</textarea></div>';
   });
   h+='</div><div class="concl"><label>Conclusiones</label><textarea data-k="concl" placeholder="Conclusiones de la sesión...">'+esc(s.concl)+'</textarea></div>';
-  h+='<div class="foot"><button class="btn" id="add">+ Añadir otro día</button><button class="btn ghost" id="dup">Duplicar sesión</button><button class="del" id="del">Borrar sesión</button></div>';
+  h+='<div class="foot"><button class="btn" id="add">+ Añadir otro día</button><button class="del" id="del">Borrar sesión</button></div>';
   app.innerHTML=h;
-  if(role==='coach'){app.querySelectorAll('input,textarea').forEach(function(x){x.disabled=true});document.getElementById('add').hidden=true;document.getElementById('del').hidden=true;document.getElementById('dup').hidden=true}
+  if(role==='coach'){app.querySelectorAll('input,textarea').forEach(function(x){x.disabled=true});document.getElementById('add').hidden=true;document.getElementById('del').hidden=true}
 }
 function card(s){
   var d=parse(s.fecha),fe=d?d.getDate()+' '+MES[d.getMonth()]+' '+d.getFullYear():'Sin fecha';
@@ -352,14 +352,6 @@ function putCk(c){if(me)put('checkins',c.id,c,{user_id:me.id,fecha:c.fecha||''})
 function saveCk(c){clearTimeout(tk[c.id]);tk[c.id]=setTimeout(function(){delete tk[c.id];putCk(c)},800)}
 function flushCk(){Object.keys(tk).forEach(function(id){clearTimeout(tk[id]);delete tk[id];var c=getCk(id);if(c)putCk(c)})}
 function delCk(id){clearTimeout(tk[id]);delete tk[id];db.checkins=db.checkins.filter(function(x){return x.id!==id});delDoc('checkins',id).then(chk)}
-function dupSes(id){
-  var o=null;for(var i=0;i<db.sessions.length;i++)if(db.sessions[i].id===id)o=db.sessions[i];if(!o)return;
-  var n=JSON.parse(JSON.stringify(o)),f=today(),d=parse(f);
-  n.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);n.t=Date.now();n.fecha=f;n.dia=DIAS[d.getDay()];n.hora='';n.concl='';n.bloque=String(Math.floor(db.sessions.length/3)+1);
-  if(/^\d+$/.test(String(n.ses).trim()))n.ses=String(+n.ses+1);
-  n.ex.forEach(function(e){e.s=e.s.map(function(){return ['','','','']});e.w=[];e.notas=''});
-  db.sessions.push(n);db.cur=n.id;save();go('edit');
-}
 function prevData(nm,s){
   var k=(nm||'').trim().toLowerCase(),r={html:'',last:null};if(!k)return r;
   var P=db.sessions.filter(function(x){return x.id!==s.id&&((x.fecha||'')<(s.fecha||'')||((x.fecha||'')===(s.fecha||'')&&x.t<s.t))}).sort(function(a,b){return (a.fecha||'').localeCompare(b.fecha||'')||a.t-b.t}),bw=null,lastS=null,lastE=null;
@@ -423,7 +415,7 @@ function rutBlock(P,co,ro){
     h+='<div class="ex mc"><input class="exn" type="text" data-r="'+i+'" data-f="nombre" value="'+esc(r.nombre)+'" placeholder="Nombre de la rutina (Fullbody, Torso…)"'+ro+'>';
     for(var j=0;j<8;j++){var o=(r.ex||[])[j]||{n:'',l:''},u=safeUrl(o.l);
       h+='<div class="lrow"><input style="flex:2" type="text" data-r="'+i+'" data-x="'+j+'" data-f="n" value="'+esc(o.n)+'" placeholder="Ejercicio '+(j+1)+'"'+ro+'>'+(co?'<input style="flex:1" type="text" inputmode="url" autocapitalize="none" data-r="'+i+'" data-x="'+j+'" data-f="l" value="'+esc(o.l)+'" placeholder="Enlace">':(u?'<a class="lk" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">Ver ↗</a>':''))+'</div>'+(co?tgIn(i,j,o):(tgtLine(o)?'<div class="pv"><span>'+tgtLine(o)+'</span></div>':''))}
-    h+=(co?'<button class="del" data-rrm="'+i+'">Quitar rutina</button>':'')+'</div>'});
+    h+=(co?'<div><button class="del" style="color:var(--ink)" data-rdup="'+i+'">Duplicar rutina</button><button class="del" data-rrm="'+i+'">Quitar rutina</button></div>':'')+'</div>'});
   return h+(co?'<div class="foot"><button class="btn" id="addrut">+ Añadir rutina</button></div>':'');
 }
 function renderPlan(){
@@ -474,11 +466,11 @@ app.addEventListener('click',function(ev){
   var gi=ev.target.dataset.goal;
   if(gi!==undefined&&role==='coach'){var gl=GOALS[+gi],ix=db.plan.obj.indexOf(gl);if(ix>=0)db.plan.obj.splice(ix,1);else db.plan.obj.push(gl);save();render()}
   if(ev.target.id==='addrut'&&role==='coach'){var pr=db.plan;pr.rutinas=pr.rutinas||[];var ex8=[];for(var z=0;z<8;z++)ex8.push({n:'',l:''});pr.rutinas.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,4),nombre:'',ex:ex8});save();render()}
+  var rdp=ev.target.dataset.rdup;
+  if(rdp!==undefined&&role==='coach'){var R0=db.plan.rutinas||[],o0=R0[+rdp];if(o0){var c0=JSON.parse(JSON.stringify(o0));c0.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);c0.nombre=(o0.nombre||'Rutina')+' (copia)';R0.splice(+rdp+1,0,c0);save();render();var nn=app.querySelector('[data-r="'+(+rdp+1)+'"][data-f="nombre"]');if(nn){nn.scrollIntoView({block:'center'});nn.focus();nn.select()}}}
   var rrm=ev.target.dataset.rrm;
   if(rrm!==undefined&&role==='coach')askDel(function(){db.plan.rutinas.splice(+rrm,1);save();render()},'¿Quitar esta rutina del plan? Las sesiones ya creadas no cambian.','Quitar');
   var ds=ev.target.dataset.dses,dc=ev.target.dataset.dck,dr=ev.target.dataset.drec;
-  if(ev.target.id==='dup')dupSes(db.cur);
-  if(ev.target.dataset.ddup)dupSes(ev.target.dataset.ddup);
   if(ds)askDel(function(){delSes(ds);render()},'¿Borrar esta sesión? No se puede deshacer.');
   if(dc)askDel(function(){delCk(dc);render()});
   if(dr){var q2=dr.split('|');askDel(function(){clearEx(q2[0],+q2[1]);render()},'¿Borrar este registro? Se vacían las series de ese ejercicio en esa sesión y dejará de contar en los récords.')}
