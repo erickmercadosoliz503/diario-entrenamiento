@@ -113,6 +113,12 @@ select{width:100%;font:500 16px 'Barlow',sans-serif;color:var(--ink);background:
 .wu input{background:transparent;border:1px dashed var(--line)}
 .wu input:focus{border:1px solid var(--accent)}
 .wadd{display:block;padding:6px 0 0;color:var(--accent);text-decoration:none;font-weight:600}
+.sum .shd{margin:6px 0 4px}
+.se{padding:10px 0;border-top:1px solid var(--line)}.se .exh{margin-bottom:2px}
+.sets{list-style:none;margin:4px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 12px}
+.sets li{font-size:15px;font-weight:600}.sets li i{font-style:normal;font-weight:500;color:var(--mute);font-size:13px}
+.sn2{display:inline-block;min-width:20px;color:var(--mute);font-weight:600}.sn2.wc{color:var(--accent)}
+.sm2{font-size:14px;color:var(--mute);margin-top:4px;white-space:pre-line}
 .g2r2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;max-width:560px}
 .cal{cursor:pointer}
 .shd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 14px;margin:14px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--accent)}
@@ -210,6 +216,8 @@ function render(){
   var ns=document.querySelectorAll('#nav button');for(var q=0;q<ns.length;q++){var vv=ns[q].dataset.v;ns[q].className=((vv==='plan'&&view==='plan')||(vv==='dia'&&(view==='edit'||view==='list'||view==='rec'))||(vv==='cfg'&&view==='cfg')||(vv==='rev'&&view==='rev'))?'on':''}
   document.getElementById('sub').hidden=!(view==='edit'||view==='list'||view==='rec');
   document.getElementById('new').hidden=!(view==='edit'||view==='list')||role==='coach';
+  if(role==='coach'&&view==='edit')view='list';
+  document.getElementById('tEdit').hidden=role==='coach';document.getElementById('tList').textContent=role==='coach'?'Sesiones':'Lista';
   document.getElementById('tEdit').className='tab'+(view==='edit'?' on':'');
   document.getElementById('tList').className='tab'+(view==='list'?' on':'');
   document.getElementById('tRec').className='tab'+(view==='rec'?' on':'');
@@ -217,6 +225,7 @@ function render(){
   if(view==='rec')return renderRec();
   if(view==='cfg')return renderCfg();
   if(view==='plan')return renderPlan();
+  if(view==='list'&&role==='coach')return renderSum();
   if(view==='list'){
     var L=sorted();
     app.innerHTML=(role==='coach'?csel():'')+(L.length?'<div class="list">'+L.map(function(s){return '<div class="cw">'+card(s)+(isRO()?'':'<div><button class="del" data-dses="'+esc(s.id)+'">Borrar</button></div>')+'</div>'}).join('')+'</div>':'<div class="empty">No hay días guardados.</div>');
@@ -242,6 +251,27 @@ function render(){
   h+='<div class="foot"><button class="btn" id="add">+ Añadir otro día</button><button class="del" id="del">Borrar sesión</button></div>';
   app.innerHTML=h;
   if(role==='coach'){app.querySelectorAll('input,textarea').forEach(function(x){x.disabled=true});document.getElementById('add').hidden=true;document.getElementById('del').hidden=true}
+}
+function setTxt(r){var rp=String(r[0]||'').trim(),w=String(r[1]||'').trim(),i=String(r[2]||'').trim();if(!rp&&!w&&!i)return '';return (rp||'—')+(w?' × '+esc(w)+' kg':'')+(i?' <i>RIR/RPE '+esc(i)+'</i>':'')}
+function renderSum(){
+  var h=csel();if(!target){app.innerHTML=h;return}
+  var L=sorted();if(!L.length){app.innerHTML=h+'<div class="empty">Este cliente aún no ha registrado ninguna sesión.</div>';return}
+  h+=L.map(function(s){
+    var nf=sesInfo(s),dd=parse(s.fecha),done=hasData(s);
+    var x='<div class="ex mc sum"><div class="ct"><span>'+esc(fe(s.fecha)||'Sin fecha')+(dd?' · '+DIAS[dd.getDay()]:'')+'</span><span>'+esc(s.hora||'')+'</span></div>';
+    x+='<div class="shd"><div class="rt">'+(s.tipo?esc(s.tipo):'Sin rutina')+'</div><div class="sbx"><span>Semana <b>'+nf.sem+'</b></span><span>Sesión n.º <b>'+nf.ses+'</b></span></div></div>';
+    if(!done&&!(s.concl||'').trim())return x+'<div class="rv mu">Sin registrar todavía.</div></div>';
+    s.ex.forEach(function(e){
+      if(!(e.n||'').trim())return;
+      var t=e.t||{},rows=[];
+      (e.w||[]).forEach(function(r){var v=setTxt(r);if(v)rows.push('<li><span class="sn2 wc">C</span>'+v+'</li>')});
+      e.s.forEach(function(r,j){var v=setTxt(r);if(v)rows.push('<li><span class="sn2">'+(j+1)+'</span>'+v+'</li>')});
+      x+='<div class="se"><div class="exh"><b>'+esc(e.n)+'</b></div>'+(tgtLine(t)?'<div class="pv"><span>Pauta: '+tgtLine(t)+'</span></div>':'')+(rows.length?'<ul class="sets">'+rows.join('')+'</ul>':'<div class="rv mu" style="font-size:14px">Sin series registradas.</div>')+((e.notas||'').trim()?'<div class="sm2">'+esc(e.notas)+'</div>':'')+'</div>';
+    });
+    if((s.concl||'').trim())x+='<label style="margin-top:10px">Conclusiones</label><div class="rv">'+esc(s.concl)+'</div>';
+    return x+'</div>';
+  }).join('');
+  app.innerHTML=h;
 }
 function card(s){
   var d=parse(s.fecha),fe=d?d.getDate()+' '+MES[d.getMonth()]+' '+d.getFullYear():'Sin fecha';
