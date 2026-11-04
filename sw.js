@@ -1,5 +1,5 @@
 // Service worker: red primero para la app, caché como respaldo sin conexión.
-var CACHE = 'diario-v1';
+var CACHE = 'diario-v2';
 var CORE = ['./', 'index.html', 'firebase-config.js', 'manifest.webmanifest', 'privacidad.html', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CORE); }).then(function () { return self.skipWaiting(); }));
@@ -16,7 +16,9 @@ self.addEventListener('fetch', function (e) {
   if (/googleapis\.com|firebaseio\.com|identitytoolkit/.test(u.hostname)) return;
   var cacheable = u.origin === location.origin || /gstatic\.com|fonts\.googleapis\.com/.test(u.hostname);
   if (!cacheable) return;
-  e.respondWith(fetch(r).then(function (res) {
+  // Lo propio de la app se pide siempre al servidor (sin la caché HTTP de 10 min de GitHub Pages)
+  var req = u.origin === location.origin ? new Request(r, { cache: 'no-cache' }) : r;
+  e.respondWith(fetch(req).then(function (res) {
     if (res && (res.ok || res.type === 'opaque')) { var cp = res.clone(); caches.open(CACHE).then(function (c) { c.put(r, cp); }); }
     return res;
   }).catch(function () {
