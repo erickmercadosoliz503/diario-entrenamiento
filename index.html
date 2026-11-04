@@ -108,6 +108,11 @@ select{width:100%;font:500 16px 'Barlow',sans-serif;color:var(--ink);background:
 .rex{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
 .rex b{flex:1;font-weight:600}
 .rex+.pv{margin:-4px 0 4px}
+.wu td.sn{color:var(--accent);white-space:nowrap}
+.wu td.sn .x{font-size:16px;padding:0 0 0 3px;vertical-align:middle}
+.wu input{background:transparent;border:1px dashed var(--line)}
+.wu input:focus{border:1px solid var(--accent)}
+.wadd{display:block;padding:6px 0 0;color:var(--accent);text-decoration:none;font-weight:600}
 .g2r2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;max-width:560px}
 .cal{cursor:pointer}
 .shd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 14px;margin:14px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--accent)}
@@ -229,8 +234,9 @@ function render(){
     h+='<div class="ex"><div class="exh"><b>'+esc(e.n||'Ejercicio '+(i+1))+'</b>'+(u?'<a class="lk" style="padding:6px 10px" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">Ver ↗</a>':'')+'</div>';
     h+='<div class="pz"><span>Series <b>'+esc(t.ns||'—')+'</b></span><span>Reps <b>'+esc(t.rp||'—')+'</b></span><span>RIR/RPE <b>'+esc(t.rir||'—')+'</b></span><span>Descanso <b>'+esc(t.desc||'—')+'</b></span></div>'+pv.html;
     h+='<table><thead><tr><th class="sn">Serie</th><th>Reps</th><th>Peso</th><th>RIR/RPE</th></tr></thead><tbody>';
+    (e.w||[]).forEach(function(r,k){h+='<tr class="wu"><td class="sn">C'+(ro?'':'<button class="x" data-wdel="'+i+'|'+k+'" title="Quitar calentamiento">×</button>')+'</td>'+[0,1,2].map(function(c){return '<td><input type="text" inputmode="decimal" data-e="'+i+'" data-w="'+k+'" data-c="'+c+'" value="'+esc(r[c])+'" aria-label="Calentamiento"></td>'}).join('')+'</tr>'});
     e.s.forEach(function(r,j){if(j>=nr&&!(r[0]||r[1]||r[2]))return;h+='<tr><td class="sn">'+(j+1)+'</td>'+[0,1,2].map(function(c){var ph=pv.last&&pv.last[j]&&pv.last[j][c]?pv.last[j][c]:(c===0?t.rp:c===2?t.rir:'')||'';return '<td><input type="text" inputmode="decimal" data-e="'+i+'" data-s="'+j+'" data-c="'+c+'" value="'+esc(r[c])+'" placeholder="'+esc(ph)+'" aria-label="Serie '+(j+1)+'"></td>'}).join('')+'</tr>'});
-    h+='</tbody></table><textarea rows="1" data-e="'+i+'" data-f="notas" placeholder="Notas">'+esc(e.notas)+'</textarea></div>';
+    h+='</tbody></table>'+(ro||(e.w||[]).length>=3?'':'<button class="del wadd" data-wadd="'+i+'">+ Serie de calentamiento</button>')+'<textarea rows="1" data-e="'+i+'" data-f="notas" placeholder="Notas">'+esc(e.notas)+'</textarea></div>';
   });
   h+='</div><div class="concl"><label>Conclusiones</label><textarea data-k="concl" placeholder="Conclusiones de la sesión...">'+esc(s.concl)+'</textarea></div>';
   h+='<div class="foot"><button class="btn" id="add">+ Añadir otro día</button><button class="btn ghost" id="dup">Duplicar sesión</button><button class="del" id="del">Borrar sesión</button></div>';
@@ -351,7 +357,7 @@ function dupSes(id){
   var n=JSON.parse(JSON.stringify(o)),f=today(),d=parse(f);
   n.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);n.t=Date.now();n.fecha=f;n.dia=DIAS[d.getDay()];n.hora='';n.concl='';n.bloque=String(Math.floor(db.sessions.length/3)+1);
   if(/^\d+$/.test(String(n.ses).trim()))n.ses=String(+n.ses+1);
-  n.ex.forEach(function(e){e.s=e.s.map(function(){return ['','','','']});e.notas=''});
+  n.ex.forEach(function(e){e.s=e.s.map(function(){return ['','','','']});e.w=[];e.notas=''});
   db.sessions.push(n);db.cur=n.id;save();go('edit');
 }
 function prevData(nm,s){
@@ -441,7 +447,7 @@ function onInput(ev){
   if(D.p!==undefined){if(role!=='coach')return;db.plan[D.p]=t.value;save();return}
   var s=cur();if(!s)return;
   if(D.k){if(D.k==='fecha'){if(ev.type!=='change'||!parse(t.value))return;s.fecha=t.value;s.dia=DIAS[parse(t.value).getDay()];save();render();return}s[D.k]=t.value}
-  else if(D.e!==undefined){var e=s.ex[+D.e];if(D.f){e[D.f]=t.value;if(D.f==='l'){var a=document.getElementById('lk'+D.e),u=safeUrl(t.value);if(a){if(u){a.href=u;a.hidden=false}else{a.removeAttribute('href');a.hidden=true}}}}else e.s[+D.s][+D.c]=t.value}
+  else if(D.e!==undefined){var e=s.ex[+D.e];if(D.f){e[D.f]=t.value;if(D.f==='l'){var a=document.getElementById('lk'+D.e),u=safeUrl(t.value);if(a){if(u){a.href=u;a.hidden=false}else{a.removeAttribute('href');a.hidden=true}}}}else if(D.w!==undefined){if(e.w&&e.w[+D.w])e.w[+D.w][+D.c]=t.value}else e.s[+D.s][+D.c]=t.value}
   else return;
   save();
 }
@@ -451,6 +457,9 @@ app.addEventListener('click',function(ev){
   var c=ev.target.closest('[data-open]');
   if(c){db.cur=c.dataset.open;go('edit');return}
   if(ev.target.classList&&ev.target.classList.contains('cal')&&!ev.target.disabled&&ev.target.showPicker){try{ev.target.showPicker()}catch(e){}}
+  var wa=ev.target.dataset.wadd,wd=ev.target.dataset.wdel;
+  if(wa!==undefined&&role!=='coach'){var sw=cur();if(sw&&sw.ex[+wa]){var ew=sw.ex[+wa];ew.w=ew.w||[];ew.w.push(['','','']);save();render();var nw=app.querySelector('[data-e="'+wa+'"][data-w="'+(ew.w.length-1)+'"][data-c="0"]');if(nw)nw.focus()}}
+  if(wd&&role!=='coach'){var sx=cur(),q3=wd.split('|'),ex3=sx&&sx.ex[+q3[0]];if(ex3&&ex3.w){var rm3=function(){ex3.w.splice(+q3[1],1);save();render()};if(ex3.w[+q3[1]].some(function(v){return v}))askDel(rm3,'¿Quitar esta serie de calentamiento?','Quitar');else rm3()}}
   if(ev.target.id==='add')newDay();
   if(ev.target.id==='del')askDel(function(){var did=db.cur;delSes(did);if(db.sessions.length)go('list');else{view='edit';render();window.scrollTo(0,0)}},'¿Borrar esta sesión? No se puede deshacer.');
   var tb=ev.target.dataset.th;
