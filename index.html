@@ -146,7 +146,13 @@ select{width:100%;font:500 16px 'Barlow',sans-serif;color:var(--ink);background:
 #nav button.on{color:var(--accent)}
 #nav svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 body.out #nav{display:none}
-main{padding-bottom:110px}
+main{padding-bottom:150px}
+.savebtn{position:fixed;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);z-index:21;border:0;border-radius:2px;padding:11px 16px;font:600 14px 'Barlow',sans-serif;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;max-width:calc(100% - 28px)}
+.savebtn.dirty{background:var(--accent);color:#0a0a0a;box-shadow:0 0 0 2px #0a0a0a}
+.savebtn.saving{background:#0a0a0a;color:#fff;cursor:default}
+.savebtn.saved{background:#0a0a0a;color:var(--accent);cursor:default}
+.savebtn.local{background:#0a0a0a;color:#f5c04a;font-size:12px}
+.savebtn.error{background:var(--danger);color:#fff}
 </style>
 </head>
 <body>
@@ -157,6 +163,7 @@ main{padding-bottom:110px}
 <div id="login" hidden></div>
 <main id="app"></main>
 <div id="modal"></div>
+<button id="savebtn" class="savebtn saved" hidden>Guardado ✓</button>
 <nav id="nav"><button data-v="plan"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Plan</button><button data-v="dia"><svg viewBox="0 0 24 24"><path d="M6 8v10M12 5v13M18 11v7"/></svg>Diario</button><button data-v="rev"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Revisiones</button><button data-v="cfg"><svg viewBox="0 0 24 24"><path d="M4 8h8M18 8h2M4 16h2M12 16h8"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg>Ajustes</button></nav>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -182,16 +189,28 @@ var db={sessions:[],cur:null}, view='list', recF='';
 try{document.documentElement.dataset.theme=localStorage.getItem('forja-tema')==='dark'?'dark':'light'}catch(e){}
 
 var dirty={};
-function save(){var s0=cur();if(s0&&role!=='coach')dirty[s0.id]=1;pend=true;clearTimeout(tm);tm=setTimeout(push,600)}
+var sv='saved',svGen=0;
+var SVT={dirty:'Guardar',saving:'Guardando…',saved:'Guardado ✓',local:'Guardado en el móvil · se subirá con conexión',error:'No se pudo guardar · Reintentar'};
+function svShow(){return !!me&&!document.body.classList.contains('out')&&(role==='coach'?view==='plan'&&!!target:(view==='edit'||(view==='rev'&&!!revCur)))}
+function paintSv(){var b=document.getElementById('savebtn');if(!b)return;b.hidden=!svShow();b.className='savebtn '+sv;b.textContent=SVT[sv]}
+function setSv(x){sv=x;paintSv()}
+// Espera a que el servidor confirme todas las escrituras pendientes
+function confirmSv(){
+  var g=++svGen;setSv('saving');
+  var to=setTimeout(function(){if(g===svGen&&sv==='saving')setSv('local')},5000);
+  fs.waitForPendingWrites().then(function(){setTimeout(function(){clearTimeout(to);if(g!==svGen)return;if(tm||Object.keys(tk).length)return setSv('dirty');setSv(lastErr?'error':'saved')},0)},function(){clearTimeout(to);if(g===svGen)setSv('error')});
+}
+function saveNow(){if(tm)push();flushCk();confirmSv()}
+function save(){svGen++;setSv('dirty');var s0=cur();if(s0&&role!=='coach')dirty[s0.id]=1;pend=true;clearTimeout(tm);tm=setTimeout(push,600)}
 function chk(r){lastErr=!!(r&&r.error);if(lastErr)console.error(r.error)}
 function push(){
   clearTimeout(tm);tm=null;
   if(!me){pend=false;return}
-  if(role==='coach'){pend=false;if(target)put('plans',target,db.plan,{client_id:target}).then(chk);return}
+  if(role==='coach'){pend=false;if(target)put('plans',target,db.plan,{client_id:target}).then(chk);confirmSv();return}
   var ids=Object.keys(dirty);dirty={};
   // Con la caché offline la escritura queda guardada en local al instante
   ids.forEach(function(id){var s=null;for(var i=0;i<db.sessions.length;i++)if(db.sessions[i].id===id)s=db.sessions[i];if(s)put('sessions',s.id,s,{user_id:me.id,fecha:s.fecha||''}).then(chk)});
-  pend=false;
+  pend=false;confirmSv();
 }
 function pad(n){return String(n).length<2?'0'+n:''+n}
 function today(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
@@ -222,6 +241,7 @@ function render(){
   document.getElementById('tEdit').className='tab'+(view==='edit'?' on':'');
   document.getElementById('tList').className='tab'+(view==='list'?' on':'');
   document.getElementById('tRec').className='tab'+(view==='rec'?' on':'');
+  paintSv();
   if(view==='rev')return renderRev();
   if(view==='rec')return renderRec();
   if(view==='cfg')return renderCfg();
@@ -380,7 +400,7 @@ function revCmp(h,L){
 }
 var tk={};
 function putCk(c){if(me)put('checkins',c.id,c,{user_id:me.id,fecha:c.fecha||''}).then(chk)}
-function saveCk(c){clearTimeout(tk[c.id]);tk[c.id]=setTimeout(function(){delete tk[c.id];putCk(c)},800)}
+function saveCk(c){svGen++;setSv('dirty');clearTimeout(tk[c.id]);tk[c.id]=setTimeout(function(){delete tk[c.id];putCk(c);confirmSv()},800)}
 function flushCk(){Object.keys(tk).forEach(function(id){clearTimeout(tk[id]);delete tk[id];var c=getCk(id);if(c)putCk(c)})}
 function delCk(id){clearTimeout(tk[id]);delete tk[id];db.checkins=db.checkins.filter(function(x){return x.id!==id});delDoc('checkins',id).then(chk)}
 function prevData(nm,s){
@@ -509,6 +529,7 @@ app.addEventListener('click',function(ev){
   if(ev.target.id==='delacc')askDelAccount();
 });
 document.getElementById('new').onclick=newDay;
+document.getElementById('savebtn').onclick=function(){if(sv!=='saving')saveNow()};
 document.getElementById('tEdit').onclick=function(){if(!cur()&&db.sessions.length)db.cur=sorted()[0].id;go('edit')};
 document.getElementById('tList').onclick=function(){go('list')};
 document.getElementById('tRec').onclick=function(){go('rec')};
@@ -553,7 +574,7 @@ function start(u,reg){
 }
 var AUTHERR={'auth/email-already-in-use':'Ese correo ya tiene una cuenta. Pulsa «Entrar».','auth/invalid-email':'El correo no es válido.','auth/weak-password':'La contraseña debe tener al menos 6 caracteres.','auth/network-request-failed':'Sin conexión. Inténtalo de nuevo.','auth/too-many-requests':'Demasiados intentos. Espera unos minutos.'};
 function showLogin(msg){
-  user=null;me=null;document.getElementById('ttl').textContent='⚡ Diario de entrenamiento';document.body.classList.add('out');app.hidden=true;loginEl.hidden=false;
+  user=null;me=null;setSv('saved');document.getElementById('ttl').textContent='⚡ Diario de entrenamiento';document.body.classList.add('out');app.hidden=true;loginEl.hidden=false;
   loginEl.innerHTML='<div class="lg"><h2>Accede a tu diario</h2><p class="lsub">Entra con tu correo y contraseña.</p><label>Correo</label><input id="lu" type="email" autocomplete="username" autocapitalize="none" spellcheck="false"><div style="height:10px"></div><label>Contraseña</label><input id="lp" type="password" autocomplete="current-password"><p class="lnote">Para crear una cuenta, rellena también lo de abajo:</p><label>Nombre</label><input id="ln" type="text" autocomplete="name"><div style="height:10px"></div><label>Tipo de cuenta</label><select id="lr"><option value="cliente">Cliente</option><option value="coach">Entrenador</option></select><div style="height:10px"></div><label>Código del entrenador (clientes)</label><input id="lc" type="text" autocapitalize="characters"><div class="lmsg" id="lm">'+esc(msg||'')+'</div><div class="lbtns"><button class="btn" id="bin">Entrar</button><button class="btn ghost" id="breg">Crear cuenta</button></div><p class="lnote"><button class="del" style="padding:0;color:var(--mute)" id="bfp">¿Olvidaste la contraseña?</button> · <a href="privacidad.html" target="_blank" rel="noopener" style="color:var(--mute)">Privacidad</a></p></div>';
   var lu=document.getElementById('lu'),lp=document.getElementById('lp'),lm=document.getElementById('lm');
   function say(t){lm.textContent=t}
