@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Publica firestore.rules en el proyecto de Firebase usando la API de Firebase Rules.
 # Pensado para ejecutarse en Google Cloud Shell (ya autenticado):
-#   git clone https://github.com/yourremotehelper/diario-entrenamiento && bash diario-entrenamiento/deploy-rules.sh
+#   git clone https://github.com/yourremotehelper/diario-entrenamiento && bash diario-entrenamiento/tools/deploy-rules.sh
 set -euo pipefail
 PROJECT="${1:-diario-entrenamiento}"
-DIR="$(cd "$(dirname "$0")" && pwd)"
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TOKEN="$(gcloud auth print-access-token)"
 API="https://firebaserules.googleapis.com/v1/projects/$PROJECT"
 BODY="$(python3 -c 'import json,sys;print(json.dumps({"source":{"files":[{"name":"firestore.rules","content":open(sys.argv[1]).read()}]}}))' "$DIR/firestore.rules")"
