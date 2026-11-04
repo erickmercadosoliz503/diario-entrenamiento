@@ -44,14 +44,14 @@ service cloud.firestore {
       allow delete: if isMe(clientId) || isCoachOf(clientId);
     }
 
-    // Sesiones y revisiones: las escribe su dueño; el entrenador las lee
+    // Sesiones, revisiones y rutinas genéricas (plantillas): las escribe su dueño; el entrenador lee las de sus clientes
     match /{col}/{docId} {
-      allow read: if col in ['sessions', 'checkins']
+      allow read: if col in ['sessions', 'checkins', 'plantillas']
         && (isMe(resource.data.user_id) || isCoachOf(resource.data.user_id));
-      allow create, update: if col in ['sessions', 'checkins']
+      allow create, update: if col in ['sessions', 'checkins', 'plantillas']
         && isMe(request.resource.data.user_id)
         && (resource == null || resource.data.user_id == request.auth.uid);
-      allow delete: if col in ['sessions', 'checkins'] && isMe(resource.data.user_id);
+      allow delete: if col in ['sessions', 'checkins', 'plantillas'] && isMe(resource.data.user_id);
     }
   }
 }

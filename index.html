@@ -164,7 +164,7 @@ main{padding-bottom:150px}
 <main id="app"></main>
 <div id="modal"></div>
 <button id="savebtn" class="savebtn saved" hidden>Guardado ✓</button>
-<nav id="nav"><button data-v="plan"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Plan</button><button data-v="dia"><svg viewBox="0 0 24 24"><path d="M6 8v10M12 5v13M18 11v7"/></svg>Diario</button><button data-v="rev"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Revisiones</button><button data-v="cfg"><svg viewBox="0 0 24 24"><path d="M4 8h8M18 8h2M4 16h2M12 16h8"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg>Ajustes</button></nav>
+<nav id="nav"><button data-v="plan"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Plan</button><button data-v="dia"><svg viewBox="0 0 24 24"><path d="M6 8v10M12 5v13M18 11v7"/></svg>Diario</button><button data-v="lib" hidden><svg viewBox="0 0 24 24"><path d="M9 4h6v3H9zM7 5H5v16h14V5h-2M9 12h6M9 16h4"/></svg>Rutinas</button><button data-v="rev"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Revisiones</button><button data-v="cfg"><svg viewBox="0 0 24 24"><path d="M4 8h8M18 8h2M4 16h2M12 16h8"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg>Ajustes</button></nav>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -191,16 +191,16 @@ try{document.documentElement.dataset.theme=localStorage.getItem('forja-tema')===
 var dirty={};
 var sv='saved',svGen=0;
 var SVT={dirty:'Guardar',saving:'Guardando…',saved:'Guardado ✓',local:'Guardado en el móvil · se subirá con conexión',error:'No se pudo guardar · Reintentar'};
-function svShow(){return !!me&&!document.body.classList.contains('out')&&(role==='coach'?view==='plan'&&!!target:(view==='edit'||(view==='rev'&&!!revCur)))}
+function svShow(){return !!me&&!document.body.classList.contains('out')&&(role==='coach'?(view==='plan'&&!!target)||(view==='lib'&&!!libSel):(view==='edit'||(view==='rev'&&!!revCur)))}
 function paintSv(){var b=document.getElementById('savebtn');if(!b)return;b.hidden=!svShow();b.className='savebtn '+sv;b.textContent=SVT[sv]}
 function setSv(x){sv=x;paintSv()}
 // Espera a que el servidor confirme todas las escrituras pendientes
 function confirmSv(){
   var g=++svGen;setSv('saving');
   var to=setTimeout(function(){if(g===svGen&&sv==='saving')setSv('local')},5000);
-  fs.waitForPendingWrites().then(function(){setTimeout(function(){clearTimeout(to);if(g!==svGen)return;if(tm||Object.keys(tk).length)return setSv('dirty');setSv(lastErr?'error':'saved')},0)},function(){clearTimeout(to);if(g===svGen)setSv('error')});
+  fs.waitForPendingWrites().then(function(){setTimeout(function(){clearTimeout(to);if(g!==svGen)return;if(tm||Object.keys(tk).length||Object.keys(tl).length)return setSv('dirty');setSv(lastErr?'error':'saved')},0)},function(){clearTimeout(to);if(g===svGen)setSv('error')});
 }
-function saveNow(){if(tm)push();flushCk();confirmSv()}
+function saveNow(){if(tm)push();flushCk();flushLib();confirmSv()}
 function save(){svGen++;setSv('dirty');var s0=cur();if(s0&&role!=='coach')dirty[s0.id]=1;pend=true;clearTimeout(tm);tm=setTimeout(push,600)}
 function chk(r){lastErr=!!(r&&r.error);if(lastErr)console.error(r.error)}
 function push(){
@@ -226,14 +226,14 @@ function cur(){for(var i=0;i<db.sessions.length;i++)if(db.sessions[i].id===db.cu
 function sorted(){return db.sessions.slice().sort(function(a,b){return (b.fecha||'').localeCompare(a.fecha||'')||(b.hora||'').localeCompare(a.hora||'')||b.t-a.t})}
 function newDay(){var s=blank();var d0=new Date();s.hora=pad(d0.getHours())+':'+pad(d0.getMinutes());db.sessions.push(s);db.cur=s.id;save();go('edit');window.scrollTo(0,0)}
 
-function go(v){view=v;render();window.scrollTo(0,0)}
+function go(v){flash='';view=v;render();window.scrollTo(0,0)}
 function fld(l,k,v,t,ex){return '<div><label>'+l+'</label><input '+(t||'type="text"')+' data-k="'+k+'" value="'+esc(v)+'" '+(ex||'')+'></div>'}
 
 function render(){
   var app=document.getElementById('app'),n=db.sessions.length;
   document.getElementById('cnt').textContent=view==='list'?n+(n===1?' día':' días'):'';
-  var TT={plan:'Plan',edit:'Diario',list:'Diario',rec:'Diario',rev:'Revisiones',cfg:'Ajustes'};document.getElementById('ttl').textContent='⚡ '+TT[view];
-  var ns=document.querySelectorAll('#nav button');for(var q=0;q<ns.length;q++){var vv=ns[q].dataset.v;ns[q].className=((vv==='plan'&&view==='plan')||(vv==='dia'&&(view==='edit'||view==='list'||view==='rec'))||(vv==='cfg'&&view==='cfg')||(vv==='rev'&&view==='rev'))?'on':''}
+  var TT={lib:'Rutinas',plan:'Plan',edit:'Diario',list:'Diario',rec:'Diario',rev:'Revisiones',cfg:'Ajustes'};document.getElementById('ttl').textContent='⚡ '+TT[view];
+  var ns=document.querySelectorAll('#nav button');for(var q=0;q<ns.length;q++){var vv=ns[q].dataset.v;ns[q].className=((vv==='plan'&&view==='plan')||(vv==='dia'&&(view==='edit'||view==='list'||view==='rec'))||(vv==='cfg'&&view==='cfg')||(vv==='lib'&&view==='lib')||(vv==='rev'&&view==='rev'))?'on':''}
   document.getElementById('sub').hidden=!(view==='edit'||view==='list'||view==='rec');
   document.getElementById('new').hidden=!(view==='edit'||view==='list')||role==='coach';
   if(role==='coach'&&view==='edit')view='list';
@@ -241,7 +241,8 @@ function render(){
   document.getElementById('tEdit').className='tab'+(view==='edit'?' on':'');
   document.getElementById('tList').className='tab'+(view==='list'?' on':'');
   document.getElementById('tRec').className='tab'+(view==='rec'?' on':'');
-  paintSv();
+  paintSv();document.querySelector('#nav [data-v="lib"]').hidden=role!=='coach';
+  if(view==='lib')return renderLib();
   if(view==='rev')return renderRev();
   if(view==='rec')return renderRec();
   if(view==='cfg')return renderCfg();
@@ -456,26 +457,56 @@ var GOALS=['Pérdida de grasa','Ganar músculo','Recomposición corporal'];
 function wk(i){var d=parse(i);if(!d)return '';var n=Math.floor((new Date()-d)/864e5);return n<0?'Empieza en '+(-n)+' día'+(n===-1?'':'s'):'Semana '+(Math.floor(n/7)+1)+' del plan'}
 function tgtLine(o){var a=[];if(o.ns)a.push('<b>'+esc(o.ns)+'</b> series');if(o.rp)a.push('<b>'+esc(o.rp)+'</b> reps');if(o.rir)a.push('RIR/RPE <b>'+esc(o.rir)+'</b>');if(o.desc)a.push('Descanso <b>'+esc(o.desc)+'</b>');return a.join(' · ')}
 function tgIn(i,j,o){function f(k,ph,m){return '<input type="text"'+(m?' inputmode="'+m+'"':'')+' data-r="'+i+'" data-x="'+j+'" data-f="'+k+'" value="'+esc(o[k])+'" placeholder="'+ph+'">'}return '<div class="rg4">'+f('ns','Series','numeric')+f('rp','Reps')+f('rir','RIR/RPE')+f('desc','Descanso')+'</div>'}
-function rutBlock(P,co,ro){
-  var R=P.rutinas||[],h='<h3 class="sec">Rutinas</h3>';
-  if(!R.length)h+='<p class="empty">'+(co?'Crea la primera rutina.':'Tu entrenador aún no ha creado rutinas.')+'</p>';
+function rutBlock(P,co,ro,R){
+  R=R||P.rutinas||[];var h='<h3 class="sec">Días de entrenamiento</h3>'+(co?'<p class="lsub" style="margin:-4px 0 10px">Al cliente le sale cada día en este orden: '+(R.length?R.map(function(r,i){return esc(r.nombre||'Día '+(i+1))}).join(' → ')+' → y vuelta a empezar':'—')+'.</p>':'');
+  if(!R.length)h+='<p class="empty">'+(co?'Añade el primer día.':'Tu entrenador aún no ha creado los días de entrenamiento.')+'</p>';
   if(!co){R.forEach(function(r){
     var L=(r.ex||[]).filter(function(o){return o&&(o.n||'').trim()});
-    h+='<div class="ex mc"><div class="rt">'+esc(r.nombre||'Rutina')+'</div>'+(L.length?L.map(function(o){var u=safeUrl(o.l);return '<div class="rex"><b>'+esc(o.n)+'</b>'+(u?'<a class="lk" style="padding:6px 10px" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">Ver ↗</a>':'')+'</div>'+(tgtLine(o)?'<div class="pv"><span>'+tgtLine(o)+'</span></div>':'')}).join(''):'<div class="rv mu">Sin ejercicios todavía.</div>')+'</div>'});return h}
+    h+='<div class="ex mc"><div class="rt">'+esc(r.nombre||'Día')+'</div>'+(L.length?L.map(function(o){var u=safeUrl(o.l);return '<div class="rex"><b>'+esc(o.n)+'</b>'+(u?'<a class="lk" style="padding:6px 10px" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">Ver ↗</a>':'')+'</div>'+(tgtLine(o)?'<div class="pv"><span>'+tgtLine(o)+'</span></div>':'')}).join(''):'<div class="rv mu">Sin ejercicios todavía.</div>')+'</div>'});return h}
   R.forEach(function(r,i){
-    h+='<div class="ex mc"><input class="exn" type="text" data-r="'+i+'" data-f="nombre" value="'+esc(r.nombre)+'" placeholder="Nombre de la rutina (Fullbody, Torso…)"'+ro+'>';
+    h+='<div class="ex mc"><input class="exn" type="text" data-r="'+i+'" data-f="nombre" value="'+esc(r.nombre)+'" placeholder="Nombre del día (Día A, Torso, Pierna…)"'+ro+'>';
     for(var j=0;j<8;j++){var o=(r.ex||[])[j]||{n:'',l:''},u=safeUrl(o.l);
       h+='<div class="lrow"><input style="flex:2" type="text" data-r="'+i+'" data-x="'+j+'" data-f="n" value="'+esc(o.n)+'" placeholder="Ejercicio '+(j+1)+'"'+ro+'>'+(co?'<input style="flex:1" type="text" inputmode="url" autocapitalize="none" data-r="'+i+'" data-x="'+j+'" data-f="l" value="'+esc(o.l)+'" placeholder="Enlace">':(u?'<a class="lk" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">Ver ↗</a>':''))+'</div>'+(co?tgIn(i,j,o):(tgtLine(o)?'<div class="pv"><span>'+tgtLine(o)+'</span></div>':''))}
-    h+=(co?'<div><button class="del" style="color:var(--ink)" data-rdup="'+i+'">Duplicar rutina</button><button class="del" data-rrm="'+i+'">Quitar rutina</button></div>':'')+'</div>'});
-  return h+(co?'<div class="foot"><button class="btn" id="addrut">+ Añadir rutina</button></div>':'');
+    h+=(co?'<div><button class="del" style="color:var(--ink)" data-rdup="'+i+'">Duplicar día</button><button class="del" data-rrm="'+i+'">Quitar día</button></div>':'')+'</div>'});
+  return h+(co?'<div class="foot"><button class="btn" id="addrut">+ Añadir día</button></div>':'');
+}
+var tpls=[],libSel=null,asgCli='',tl={},flash='';
+function flashBox(){return flash?'<div class="note">'+esc(flash)+'</div>':''}
+function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function tplById(id){for(var i=0;i<tpls.length;i++)if(tpls[i].id===id)return tpls[i];return null}
+function libCur(){return view==='lib'&&libSel?tplById(libSel):null}
+function rutArr(mk){var t=libCur();if(t){t.dias=t.dias||[];return t.dias}if(mk)db.plan.rutinas=db.plan.rutinas||[];return db.plan.rutinas}
+function saveScope(){var t=libCur();if(t)saveLib(t);else save()}
+function putLib(t){if(me)put('plantillas',t.id,t,{user_id:me.id}).then(chk)}
+function saveLib(t){svGen++;setSv('dirty');clearTimeout(tl[t.id]);tl[t.id]=setTimeout(function(){delete tl[t.id];putLib(t);confirmSv()},600)}
+function flushLib(){Object.keys(tl).forEach(function(id){clearTimeout(tl[id]);delete tl[id];var t=tplById(id);if(t)putLib(t)})}
+// Copia los días de una rutina genérica al plan del cliente (sustituye los actuales)
+function assignTpl(t,cid,nm){
+  flushLib();if(tm)push();
+  var dias=JSON.parse(JSON.stringify(t.dias||[])).map(function(d){d.id=nid();return d});
+  function apply(pl){pl=pl||{cli:'',kcal:'',p:'',c:'',g:''};pl.rutinas=dias;pl.rutina=t.nombre||'';put('plans',cid,pl,{client_id:cid}).then(chk);confirmSv();if(cid===target)db.plan=pl;flash='Rutina «'+(t.nombre||'')+'» asignada'+(nm?' a '+nm:'')+'. Ya le aparece en su Plan y en el Diario.';render()}
+  if(cid===target)apply(db.plan);else getData('plans',cid).then(apply,function(){flash='No se pudo leer el plan del cliente. Inténtalo de nuevo.';render()});
+}
+function renderLib(){
+  var t=libCur(),h=flashBox();
+  if(!t){
+    h+='<p class="lsub">Crea aquí tus rutinas genéricas y asígnalas a los clientes que quieras. Al asignarla, sus días se copian al Plan del cliente.</p><button class="btn" id="newtpl" style="margin-bottom:14px">+ Nueva rutina</button>';
+    h+=tpls.length?'<div class="list">'+tpls.map(function(x){var D=x.dias||[];return '<button class="card" data-otpl="'+esc(x.id)+'"><div class="ct"><span>'+esc(x.nombre||'Sin nombre')+'</span><span>'+D.length+(D.length===1?' día':' días')+'</span></div><div class="ch">'+D.map(function(d){return '<i>'+esc(d.nombre||'Día')+'</i>'}).join('')+'</div></button>'}).join('')+'</div>':'<div class="empty">Aún no tienes rutinas guardadas.</div>';
+    app.innerHTML=h;return;
+  }
+  h+='<button class="del" id="libback" style="margin-bottom:8px">← Volver</button><label>Nombre de la rutina</label><input class="exn" type="text" data-tn="1" value="'+esc(t.nombre)+'" placeholder="Fuerza 3 días, Hipertrofia torso/pierna…">';
+  h+='<h3 class="sec">Asignar a un cliente</h3>'+(clients.length?'<div class="lrow"><select id="asgsel" style="flex:1">'+clients.map(function(c){return '<option value="'+esc(c.id)+'"'+(c.id===asgCli?' selected':'')+'>'+esc(c.nombre||c.id.slice(0,6))+'</option>'}).join('')+'</select><button class="btn" id="asgbtn">Asignar</button></div>':'<p class="lsub">Aún no tienes clientes. Tu código de entrenador: <b>'+esc(me.coach_code)+'</b></p>');
+  h+=rutBlock({},true,'',t.dias||[]);
+  h+='<div class="foot"><span></span><button class="del" data-dtpl="'+esc(t.id)+'">Borrar rutina</button></div>';
+  app.innerHTML=h;
 }
 function renderPlan(){
-  var P=db.plan,co=role==='coach',ro=co?'':' readonly',h=co?csel():'';
+  var P=db.plan,co=role==='coach',ro=co?'':' readonly',h=(co?csel():'')+flashBox();
   if(co&&!target){app.innerHTML=h;return}
   if(!Array.isArray(P.obj))P.obj=[];
   function f(l,k,t){if(!co){var v=t==='date'?fe(P[k]):(P[k]||'');return '<div><label>'+l+'</label><div class="rv'+(v?'':' mu')+'">'+(v?esc(v):'—')+'</div></div>'}return '<div><label>'+l+'</label><input type="'+(t||'text')+'" data-p="'+k+'" value="'+esc(P[k])+'"'+(t?(co?'':' disabled'):ro)+'></div>'}
   function ta(l,k,r,ph){if(!co)return '<label style="margin-top:12px">'+l+'</label><div class="rv'+(P[k]?'':' mu')+'">'+(P[k]?esc(P[k]):'—')+'</div>';return '<label style="margin-top:12px">'+l+'</label><textarea rows="'+r+'" data-p="'+k+'"'+ro+(ph?' placeholder="'+ph+'"':'')+'>'+esc(P[k])+'</textarea>'}
-  h+='<div class="g2">'+(co?'':'<div><label>Cliente</label><div class="rv">'+esc(me.nombre||'—')+'</div></div>')+f('Fecha de inicio','ini','date')+'</div>'+(P.ini?'<p class="lsub" style="margin:6px 0 0">'+wk(P.ini)+'</p>':'')+'<h3 class="sec">Objetivo del cliente</h3><div class="chips">'+GOALS.map(function(g,i){return '<button class="chip'+(P.obj.indexOf(g)>=0?' on':'')+'" data-goal="'+i+'"'+(co?'':' disabled')+'>'+g+'</button>'}).join('')+'</div>'+ta('Detalle de los objetivos','ot',4,'Ej.: bajar 6 kg de grasa en 12 semanas')+'<h3 class="sec">Objetivos de nutrición</h3><div class="g4">'+f('Calorías','kcal')+f('Proteína (g)','p')+f('Carbos (g)','c')+f('Grasas (g)','g')+'</div>'+ta('Notas de nutrición','nt',4)+rutBlock(P,co,ro);
+  h+='<div class="g2">'+(co?'':'<div><label>Cliente</label><div class="rv">'+esc(me.nombre||'—')+'</div></div>')+f('Fecha de inicio','ini','date')+'</div>'+(P.ini?'<p class="lsub" style="margin:6px 0 0">'+wk(P.ini)+'</p>':'')+'<h3 class="sec">Objetivo del cliente</h3><div class="chips">'+GOALS.map(function(g,i){return '<button class="chip'+(P.obj.indexOf(g)>=0?' on':'')+'" data-goal="'+i+'"'+(co?'':' disabled')+'>'+g+'</button>'}).join('')+'</div>'+ta('Detalle de los objetivos','ot',4,'Ej.: bajar 6 kg de grasa en 12 semanas')+'<h3 class="sec">Objetivos de nutrición</h3><div class="g4">'+f('Calorías','kcal')+f('Proteína (g)','p')+f('Carbos (g)','c')+f('Grasas (g)','g')+'</div>'+ta('Notas de nutrición','nt',4)+(co?'<h3 class="sec">Rutina</h3><div class="lrow"><select id="tplsel" style="flex:1"><option value="">'+(tpls.length?'Cargar una de mis rutinas…':'Aún no tienes rutinas guardadas (menú Rutinas)')+'</option>'+tpls.map(function(t){return '<option value="'+esc(t.id)+'">'+esc(t.nombre||'Sin nombre')+' ('+(t.dias||[]).length+' días)</option>'}).join('')+'</select></div>'+(P.rutina?'<p class="lsub" style="margin:0 0 6px">Rutina asignada: <b>'+esc(P.rutina)+'</b></p>':''):(P.rutina?'<h3 class="sec">Rutina</h3><div class="rv">'+esc(P.rutina)+'</div>':''))+rutBlock(P,co,ro);
   app.innerHTML=h;
 }
 var app=document.getElementById('app');
@@ -485,8 +516,11 @@ function onInput(ev){
   if(D.cmp){if(D.cmp==='A')cmpA=t.value;else if(D.cmp==='B')cmpB=t.value;else cmpV=t.value;render();return}
   if(D.rv){var ck=getCk(revCur);if(!ck)return;var pp=D.rv.split('.');if(pp.length>1)ck[pp[0]][pp[1]]=t.value;else ck[pp[0]]=t.value;saveCk(ck);return}
   if(t.id==='rsel'){recF=t.value;render();return}
-  if(t.id==='csel'){if(t.value===target)return;var ae=document.activeElement;if(ae&&ae!==t&&ae.blur)ae.blur();if(tm)push();target=t.value;loadTarget().then(function(){startLive();render()});return}
-  if(D.r!==undefined){if(role!=='coach')return;var rr=db.plan.rutinas&&db.plan.rutinas[+D.r];if(!rr)return;if(D.x!==undefined){rr.ex=rr.ex||[];for(var q=0;q<8;q++)if(!rr.ex[q])rr.ex[q]={n:'',l:''};rr.ex[+D.x][D.f]=t.value}else rr[D.f]=t.value;save();return}
+  if(t.id==='csel'){flash='';if(t.value===target)return;var ae=document.activeElement;if(ae&&ae!==t&&ae.blur)ae.blur();if(tm)push();target=t.value;loadTarget().then(function(){startLive();render()});return}
+  if(D.tn!==undefined){var tq=libCur();if(tq){tq.nombre=t.value;saveLib(tq)}return}
+  if(t.id==='tplsel'){if(ev.type==='change'&&t.value){var tv=t.value;t.value='';var tp=tplById(tv);if(tp&&target)askDel(function(){assignTpl(tp,target)},'Se cargarán los '+(tp.dias||[]).length+' días de «'+esc(tp.nombre||'')+'» en el plan de este cliente y sustituirán a los actuales. Las sesiones ya registradas no cambian.','Cargar')}return}
+  if(t.id==='asgsel'){asgCli=t.value;return}
+  if(D.r!==undefined){if(role!=='coach')return;var RA=rutArr(),rr=RA&&RA[+D.r];if(!rr)return;if(D.x!==undefined){rr.ex=rr.ex||[];for(var q=0;q<8;q++)if(!rr.ex[q])rr.ex[q]={n:'',l:''};rr.ex[+D.x][D.f]=t.value}else rr[D.f]=t.value;saveScope();return}
   if(D.p!==undefined){if(role!=='coach')return;db.plan[D.p]=t.value;save();return}
   var s=cur();if(!s)return;
   if(D.k){if(D.k==='fecha'){if(ev.type!=='change'||!parse(t.value))return;s.fecha=t.value;s.dia=DIAS[parse(t.value).getDay()];save();render();return}s[D.k]=t.value}
@@ -516,16 +550,21 @@ app.addEventListener('click',function(ev){
   if(drv)askDel(function(){delCk(drv);revCur=null;render()});
   var gi=ev.target.dataset.goal;
   if(gi!==undefined&&role==='coach'){var gl=GOALS[+gi],ix=db.plan.obj.indexOf(gl);if(ix>=0)db.plan.obj.splice(ix,1);else db.plan.obj.push(gl);save();render()}
-  if(ev.target.id==='addrut'&&role==='coach'){var pr=db.plan;pr.rutinas=pr.rutinas||[];var ex8=[];for(var z=0;z<8;z++)ex8.push({n:'',l:''});pr.rutinas.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,4),nombre:'',ex:ex8});save();render()}
+  if(ev.target.id==='addrut'&&role==='coach'){var RA2=rutArr(true),ex8=[];for(var z=0;z<8;z++)ex8.push({n:'',l:''});RA2.push({id:nid(),nombre:'Día '+'ABCDEFGHIJ'.charAt(RA2.length%10),ex:ex8});saveScope();render()}
   var rdp=ev.target.dataset.rdup;
-  if(rdp!==undefined&&role==='coach'){var R0=db.plan.rutinas||[],o0=R0[+rdp];if(o0){var c0=JSON.parse(JSON.stringify(o0));c0.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);c0.nombre=(o0.nombre||'Rutina')+' (copia)';R0.splice(+rdp+1,0,c0);save();render();var nn=app.querySelector('[data-r="'+(+rdp+1)+'"][data-f="nombre"]');if(nn){nn.scrollIntoView({block:'center'});nn.focus();nn.select()}}}
+  if(rdp!==undefined&&role==='coach'){var R0=rutArr(true),o0=R0[+rdp];if(o0){var c0=JSON.parse(JSON.stringify(o0));c0.id=nid();c0.nombre=(o0.nombre||'Día')+' (copia)';R0.splice(+rdp+1,0,c0);saveScope();render();var nn=app.querySelector('[data-r="'+(+rdp+1)+'"][data-f="nombre"]');if(nn){nn.scrollIntoView({block:'center'});nn.focus();nn.select()}}}
   var rrm=ev.target.dataset.rrm;
-  if(rrm!==undefined&&role==='coach')askDel(function(){db.plan.rutinas.splice(+rrm,1);save();render()},'¿Quitar esta rutina del plan? Las sesiones ya creadas no cambian.','Quitar');
+  if(rrm!==undefined&&role==='coach')askDel(function(){rutArr(true).splice(+rrm,1);saveScope();render()},'¿Quitar este día? Las sesiones ya registradas no cambian.','Quitar');
+  if(ev.target.id==='newtpl'&&role==='coach'){var ex9=[];for(var y=0;y<8;y++)ex9.push({n:'',l:''});var nt={id:nid(),nombre:'',dias:[{id:nid(),nombre:'Día A',ex:ex9}]};tpls.push(nt);libSel=nt.id;saveLib(nt);render();window.scrollTo(0,0);var ni=app.querySelector('[data-tn]');if(ni)ni.focus()}
+  var otp=ev.target.closest('[data-otpl]');if(otp){flash='';libSel=otp.dataset.otpl;asgCli='';render();window.scrollTo(0,0)}
+  if(ev.target.id==='libback'){flash='';flushLib();libSel=null;render()}
+  if(ev.target.dataset.dtpl){var dt=ev.target.dataset.dtpl;askDel(function(){clearTimeout(tl[dt]);delete tl[dt];tpls=tpls.filter(function(x){return x.id!==dt});delDoc('plantillas',dt).then(chk);libSel=null;render()},'¿Borrar esta rutina de tu biblioteca? Los clientes que ya la tienen asignada no cambian.')}
+  if(ev.target.id==='asgbtn'){var ta2=libCur(),cl=null;clients.forEach(function(c){if(c.id===(asgCli||(clients[0]&&clients[0].id)))cl=c});if(ta2&&cl)askDel(function(){assignTpl(ta2,cl.id,cl.nombre)},'Se cargarán los '+(ta2.dias||[]).length+' días de «'+esc(ta2.nombre||'')+'» en el plan de '+esc(cl.nombre||'este cliente')+' y sustituirán a los actuales. Las sesiones ya registradas no cambian.','Asignar')}
   var ds=ev.target.dataset.dses,dc=ev.target.dataset.dck,dr=ev.target.dataset.drec;
   if(ds)askDel(function(){delSes(ds);render()},'¿Borrar esta sesión? No se puede deshacer.');
   if(dc)askDel(function(){delCk(dc);render()});
   if(dr){var q2=dr.split('|');askDel(function(){clearEx(q2[0],+q2[1]);render()},'¿Borrar este registro? Se vacían las series de ese ejercicio en esa sesión y dejará de contar en los récords.')}
-  if(ev.target.id==='out'){if(tm)push();flushCk();stopLive();auth.signOut().then(function(){me=null;showLogin()})}
+  if(ev.target.id==='out'){if(tm)push();flushCk();flushLib();tpls=[];libSel=null;stopLive();auth.signOut().then(function(){me=null;showLogin()})}
   if(ev.target.id==='delacc')askDelAccount();
 });
 document.getElementById('new').onclick=newDay;
@@ -560,7 +599,7 @@ function start(u,reg){
   }).then(function(p){
     me=p;role=p.role==='coach'?'coach':'cliente';user=u.email;
     if(role!=='coach')return;
-    return fs.collection('profiles').where('coach_id','==',me.id).get().then(function(q){clients=q.docs.map(function(x){return x.data()});target=clients.length?clients[0].id:null});
+    return Promise.all([fs.collection('profiles').where('coach_id','==',me.id).get().then(function(q){clients=q.docs.map(function(x){return x.data()});target=clients.length?clients[0].id:null}),listData('plantillas',me.id).then(function(L){tpls=L},function(){tpls=[]})]);
   }).then(loadTarget).then(function(){
     document.body.classList.remove('out');app.hidden=false;loginEl.hidden=true;loginEl.innerHTML='';
     if(role!=='coach'&&!db.sessions.length){var f=blank();db.sessions.push(f);db.cur=f.id;save()}
@@ -613,7 +652,7 @@ function askDelAccount(){
     dm.textContent='Borrando…';
     stopLive();for(var id in tk)clearTimeout(tk[id]);tk={};clearTimeout(tm);dirty={};
     u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,pw)).then(function(){
-      var uid=u.uid,jobs=['sessions','checkins'].map(function(c){return fs.collection(c).where('user_id','==',uid).get().then(function(q){return Promise.all(q.docs.map(function(d){return d.ref.delete()}))})});
+      var uid=u.uid,jobs=['sessions','checkins','plantillas'].map(function(c){return fs.collection(c).where('user_id','==',uid).get().then(function(q){return Promise.all(q.docs.map(function(d){return d.ref.delete()}))})});
       if(role!=='coach')jobs.push(fs.collection('plans').doc(uid).delete().catch(function(){}));
       if(me&&me.coach_code)jobs.push(fs.collection('coachCodes').doc(me.coach_code).delete());
       return Promise.all(jobs).then(function(){return fs.collection('profiles').doc(uid).delete()}).then(function(){return u.delete()});
@@ -622,8 +661,8 @@ function askDelAccount(){
 }
 
 app.addEventListener('focusout',function(){setTimeout(function(){if(liveDirty&&!typingNow())liveRender()},0)});
-document.addEventListener('visibilitychange',function(){if(document.hidden){if(tm)push();flushCk()}});
-window.addEventListener('pagehide',function(){if(tm)push();flushCk()});
+document.addEventListener('visibilitychange',function(){if(document.hidden){if(tm)push();flushCk();flushLib()}});
+window.addEventListener('pagehide',function(){if(tm)push();flushCk();flushLib()});
 var booted=false;auth.onAuthStateChanged(function(u){if(booted)return;booted=true;if(u)start(u);else showLogin()});
 if('serviceWorker' in navigator)window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})});
 })();
