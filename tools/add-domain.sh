@@ -2,7 +2,7 @@
 # Añade un dominio autorizado a Firebase Authentication. Para Google Cloud Shell.
 #   bash diario-entrenamiento/tools/add-domain.sh erickmercadosoliz503.github.io
 set -euo pipefail
-DOMAIN="$1"; PROJECT="${2:-diario-entrenamiento}"
+DOMAIN="$1"; PROJECT="${2:-diario-entrenamiento-59424}"
 TOKEN="$(gcloud auth print-access-token)"
 URL="https://identitytoolkit.googleapis.com/admin/v2/projects/$PROJECT/config"
 H=(-H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -H "X-Goog-User-Project: $PROJECT")

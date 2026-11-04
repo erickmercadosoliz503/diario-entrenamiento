@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Crea (si no existe) la app web de Firebase y muestra su configuración. Para Google Cloud Shell.
 set -euo pipefail
-PROJECT="${1:-diario-entrenamiento}"
+PROJECT="${1:-diario-entrenamiento-59424}"
 TOKEN="$(gcloud auth print-access-token)"
 API="https://firebase.googleapis.com/v1beta1/projects/$PROJECT"
 H=(-H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -H "X-Goog-User-Project: $PROJECT")

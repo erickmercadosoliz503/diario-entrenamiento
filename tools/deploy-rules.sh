@@ -3,7 +3,7 @@
 # Pensado para ejecutarse en Google Cloud Shell (ya autenticado):
 #   git clone https://github.com/erickmercadosoliz503/diario-entrenamiento && bash diario-entrenamiento/tools/deploy-rules.sh
 set -euo pipefail
-PROJECT="${1:-diario-entrenamiento}"
+PROJECT="${1:-diario-entrenamiento-59424}"
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TOKEN="$(gcloud auth print-access-token)"
 API="https://firebaserules.googleapis.com/v1/projects/$PROJECT"
