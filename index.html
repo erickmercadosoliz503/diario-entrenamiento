@@ -235,7 +235,7 @@ function render(){
   var TT={lib:'Rutinas',plan:'Plan',edit:'Diario',list:'Diario',rec:'Diario',rev:'Revisiones',cfg:'Ajustes'};document.getElementById('ttl').textContent='⚡ '+TT[view];
   var ns=document.querySelectorAll('#nav button');for(var q=0;q<ns.length;q++){var vv=ns[q].dataset.v;ns[q].className=((vv==='plan'&&view==='plan')||(vv==='dia'&&(view==='edit'||view==='list'||view==='rec'))||(vv==='cfg'&&view==='cfg')||(vv==='lib'&&view==='lib')||(vv==='rev'&&view==='rev'))?'on':''}
   document.getElementById('sub').hidden=!(view==='edit'||view==='list'||view==='rec');
-  document.getElementById('new').hidden=!(view==='edit'||view==='list')||role==='coach';
+  document.getElementById('new').hidden=true;
   if(role==='coach'&&view==='edit')view='list';
   document.getElementById('tEdit').hidden=role==='coach';document.getElementById('tList').textContent=role==='coach'?'Sesiones':'Lista';
   document.getElementById('tEdit').className='tab'+(view==='edit'?' on':'');
@@ -253,7 +253,7 @@ function render(){
     app.innerHTML=(role==='coach'?csel():'')+(L.length?'<div class="list">'+L.map(function(s){return '<div class="cw">'+card(s)+(isRO()?'':'<div><button class="del" data-dses="'+esc(s.id)+'">Borrar</button></div>')+'</div>'}).join('')+'</div>':'<div class="empty">No hay días guardados.</div>');
     return;
   }
-  var s=cur();if(!s&&role==='coach'&&db.sessions.length){db.cur=sorted()[0].id;s=cur()}if(!s){if(role==='coach'){app.innerHTML=csel()+'<div class="empty">Sin sesiones.</div>';return}s=blank();db.sessions.push(s);db.cur=s.id;save()}
+  var s=cur();if(!s&&role==='coach'&&db.sessions.length){db.cur=sorted()[0].id;s=cur()}if(!s){if(role==='coach'){app.innerHTML=csel()+'<div class="empty">Sin sesiones.</div>';return}return renderStart()}
   if(syncRut(s))save();
   var nf=sesInfo(s),dd=parse(s.fecha),ro=role==='coach',vis=s.ex.map(function(e,i){return i}).filter(function(i){var e=s.ex[i];return (e.n||'').trim()||e.s.some(function(r){return r[0]||r[1]||r[2]})});
   var h=(ro?csel():'')+(function(){var m=notice;notice='';return m?'<div class="note">'+esc(m)+'</div>':''})();
@@ -270,9 +270,23 @@ function render(){
     h+='</tbody></table>'+(ro||(e.w||[]).length>=3?'':'<button class="del wadd" data-wadd="'+i+'">+ Serie de calentamiento</button>')+'<textarea rows="1" data-e="'+i+'" data-f="notas" placeholder="Notas">'+esc(e.notas)+'</textarea></div>';
   });
   h+='</div><div class="concl"><label>Conclusiones</label><textarea data-k="concl" placeholder="Conclusiones de la sesión...">'+esc(s.concl)+'</textarea></div>';
-  h+='<div class="foot"><button class="btn" id="add">+ Añadir otro día</button><button class="del" id="del">Borrar sesión</button></div>';
+  h+='<div class="foot"><span></span><button class="del" id="del">Borrar sesión</button></div>';
   app.innerHTML=h;
-  if(role==='coach'){app.querySelectorAll('input,textarea').forEach(function(x){x.disabled=true});document.getElementById('add').hidden=true;document.getElementById('del').hidden=true}
+  if(role==='coach'){app.querySelectorAll('input,textarea').forEach(function(x){x.disabled=true});document.getElementById('del').hidden=true}
+}
+// Sesión de hoy ya empezada (si la hay)
+function todaySes(){var T=today(),L=db.sessions.filter(function(x){return x.fecha===T}).sort(function(a,b){return b.t-a.t});return L[0]||null}
+// Al entrar en Sesión: la de hoy si existe; si no, la pantalla para empezar la que toca
+function openToday(){var t=todaySes();db.cur=t?t.id:null}
+function renderStart(){
+  var r=nextRut({id:'',fecha:today(),t:Date.now()}),L=sorted(),last=L[0],h='';
+  if(!r){app.innerHTML='<div class="empty">Tu entrenador aún no ha creado los días de entrenamiento en tu Plan. Cuando lo haga, aquí te aparecerá el que te toca.</div>';return}
+  var X=(r.ex||[]).filter(function(o){return o&&(o.n||'').trim()});
+  h+='<div class="ex mc start"><label>Hoy te toca</label><div class="rt" style="font-size:30px">'+esc(r.nombre||'Entrenamiento')+'</div>';
+  h+=X.map(function(o){var u=safeUrl(o.l);return '<div class="rex"><b>'+esc(o.n)+'</b>'+(u?'<a class="lk" style="padding:6px 10px" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">Ver ↗</a>':'')+'</div>'+(tgtLine(o)?'<div class="pv"><span>'+tgtLine(o)+'</span></div>':'')}).join('');
+  h+='<button class="btn" id="startday" style="width:100%;margin-top:14px;padding:14px">Empezar '+esc(r.nombre||'entrenamiento')+'</button></div>';
+  if(last)h+='<p class="lsub" style="text-align:center">Último entrenamiento: '+esc(last.tipo||'Sin rutina')+' · '+esc(fe(last.fecha))+' · <button class="del" style="padding:0;color:var(--acct)" data-open="'+esc(last.id)+'">Ver</button></p>';
+  app.innerHTML=h;
 }
 function setTxt(r){var rp=String(r[0]||'').trim(),w=String(r[1]||'').trim(),i=String(r[2]||'').trim();if(!rp&&!w&&!i)return '';return (rp||'—')+(w?' × '+esc(w)+' kg':'')+(i?' <i>RIR/RPE '+esc(i)+'</i>':'')}
 function renderSum(){
@@ -537,8 +551,8 @@ app.addEventListener('click',function(ev){
   var wa=ev.target.dataset.wadd,wd=ev.target.dataset.wdel;
   if(wa!==undefined&&role!=='coach'){var sw=cur();if(sw&&sw.ex[+wa]){var ew=sw.ex[+wa];ew.w=ew.w||[];ew.w.push(['','','']);save();render();var nw=app.querySelector('[data-e="'+wa+'"][data-w="'+(ew.w.length-1)+'"][data-c="0"]');if(nw)nw.focus()}}
   if(wd&&role!=='coach'){var sx=cur(),q3=wd.split('|'),ex3=sx&&sx.ex[+q3[0]];if(ex3&&ex3.w){var rm3=function(){ex3.w.splice(+q3[1],1);save();render()};if(ex3.w[+q3[1]].some(function(v){return v}))askDel(rm3,'¿Quitar esta serie de calentamiento?','Quitar');else rm3()}}
-  if(ev.target.id==='add')newDay();
-  if(ev.target.id==='del')askDel(function(){var did=db.cur;delSes(did);if(db.sessions.length)go('list');else{view='edit';render();window.scrollTo(0,0)}},'¿Borrar esta sesión? No se puede deshacer.');
+  if(ev.target.id==='startday'&&role!=='coach')newDay();
+  if(ev.target.id==='del')askDel(function(){var did=db.cur;delSes(did);go(db.sessions.length?'list':'edit')},'¿Borrar esta sesión? No se puede deshacer.');
   var tb=ev.target.dataset.th;
   if(tb){document.documentElement.dataset.theme=tb;try{localStorage.setItem('forja-tema',tb)}catch(e){}render()}
   var rt=ev.target.dataset.rt,orv=ev.target.closest('[data-orev]'),rph=ev.target.dataset.rph,drv=ev.target.dataset.drev;
@@ -569,10 +583,10 @@ app.addEventListener('click',function(ev){
 });
 document.getElementById('new').onclick=newDay;
 document.getElementById('savebtn').onclick=function(){if(sv!=='saving')saveNow()};
-document.getElementById('tEdit').onclick=function(){if(!cur()&&db.sessions.length)db.cur=sorted()[0].id;go('edit')};
+document.getElementById('tEdit').onclick=function(){if(role!=='coach')openToday();go('edit')};
 document.getElementById('tList').onclick=function(){go('list')};
 document.getElementById('tRec').onclick=function(){go('rec')};
-document.getElementById('nav').onclick=function(ev){var b=ev.target.closest('button');if(!b)return;var v=b.dataset.v;if(v==='dia'){if(!cur()&&db.sessions.length)db.cur=sorted()[0].id;go(view==='list'||view==='rec'?view:'edit')}else go(v)};
+document.getElementById('nav').onclick=function(ev){var b=ev.target.closest('button');if(!b)return;var v=b.dataset.v;if(v==='dia'){if(role!=='coach')openToday();go(view==='list'||view==='rec'?view:'edit')}else go(v)};
 
 function safeUrl(v){v=(v||'').trim();if(!v)return '';if(!/^https?:\/\//i.test(v))v='https://'+v;try{var u=new URL(v);return /^https?:$/.test(u.protocol)?u.href:''}catch(e){return ''}}
 
@@ -602,7 +616,6 @@ function start(u,reg){
     return Promise.all([fs.collection('profiles').where('coach_id','==',me.id).get().then(function(q){clients=q.docs.map(function(x){return x.data()});target=clients.length?clients[0].id:null}),listData('plantillas',me.id).then(function(L){tpls=L},function(){tpls=[]})]);
   }).then(loadTarget).then(function(){
     document.body.classList.remove('out');app.hidden=false;loginEl.hidden=true;loginEl.innerHTML='';
-    if(role!=='coach'&&!db.sessions.length){var f=blank();db.sessions.push(f);db.cur=f.id;save()}
     view='plan';render();window.scrollTo(0,0);startLive();
   }).catch(function(e){
     console.error(e);
